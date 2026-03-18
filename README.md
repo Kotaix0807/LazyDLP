@@ -1,6 +1,8 @@
 # LazyDLP
 
-LazyDLP es una herramienta con interfaz gráfica (GUI) ligera y nativa para Windows, diseñada para facilitar la descarga de videos y audios de YouTube aprovechando el poderoso motor de `yt-dlp` y `ffmpeg`.
+LazyDLP es una herramienta con interfaz gráfica (GUI) ligera y nativa para Windows, diseñada para facilitar la descarga de videos y audios de YouTube aprovechando el motor de `yt-dlp` y `ffmpeg`.
+
+Principalmente el objetivo de esta herramienta, es brindar la capacidad de descargar videos de youtube de manera limpia, sencilla y libre de malware, específiamente desarrollado para el público general. Es por esta razón que no existe soporte para linux y/o mac.
 
 ## ✨ Características
 
