@@ -4,5 +4,5 @@ assets/logs/error_log.txt
 assets/config/yt_config.ini
 LazyDLP-installer.bat
 LazyDLP-terminal.bat
-Gen_exe.bat
+gen_exe.bat
 LazyDLP.vbs
