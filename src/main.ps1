@@ -6,13 +6,31 @@ try {
     [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 } catch {}
 
+# Forzar a Windows a tratar este script como una aplicación independiente en la barra de tareas
+$appIdCode = @'
+using System;
+using System.Runtime.InteropServices;
+public class TaskbarFix {
+    [DllImport("shell32.dll", SetLastError = true)]
+    public static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+}
+'@
+Add-Type -TypeDefinition $appIdCode -Language CSharp
+try { [TaskbarFix]::SetCurrentProcessExplicitAppUserModelID("LazyDLP.App") } catch {}
+
 $baseDir = $PSScriptRoot
 
 # Subir un nivel desde 'src' hacia la raíz del proyecto y entrar a 'assets'
 $assetsDir = Join-Path (Split-Path $baseDir -Parent) "assets"
 if (!(Test-Path $assetsDir)) { New-Item -ItemType Directory -Path $assetsDir | Out-Null }
-$logFile = Join-Path $assetsDir "error_log.txt"
-$configFile = Join-Path $assetsDir "yt_config.ini"
+$logFile = Join-Path $assetsDir "logs/error_log.txt"
+$configFile = Join-Path $assetsDir "config/yt_config.ini"
+$iconPath = Join-Path $assetsDir "images/LazyDLP.ico"
+
+$global:appIcon = $null
+if (Test-Path $iconPath) {
+    $global:appIcon = New-Object System.Drawing.Icon($iconPath)
+}
 
 # Limpieza automática de log viejo (si pesa más de 1MB)
 if (Test-Path $logFile) {
@@ -26,6 +44,7 @@ function Write-Log($detail) {
 function Mostrar-Carga($texto, $permitirCancelar = $false) {
     $c = New-Object System.Windows.Forms.Form
     $c.Text = "Procesando..."; $c.StartPosition = "CenterScreen"
+    if ($global:appIcon) { $c.Icon = $global:appIcon }
     $c.FormBorderStyle = "FixedDialog"; $c.ControlBox = $false; $c.TopMost = $true
     $c.BackColor = [System.Drawing.Color]::White
     $c.Font = New-Object System.Drawing.Font("Segoe UI", 10)
@@ -58,7 +77,7 @@ function Mostrar-Carga($texto, $permitirCancelar = $false) {
 
     $c.Show()
     for($i=0; $i -lt 15; $i++){ [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 15 }
-    return [PSCustomObject]@{ Form = $c; Label = $lbl }
+    return [PSCustomObject]@{ Form = $c; Label = $lbl; ProgressBar = $pb }
 }
 
 function Ejecutar-YtDlp($argumentos, $winObj, $esDescarga) {
@@ -105,11 +124,24 @@ function Ejecutar-YtDlp($argumentos, $winObj, $esDescarga) {
                     
                     if ($esDescarga) {
                         $trimLine = $line.Trim()
-                        if ($trimLine -match "\[download\]\s*([\d\.]+%)\s*of\s*~?\s*[\d\.]+[a-zA-Z]+(?:.*?at\s+([^\s]+))?(?:\s+ETA\s+([^\s]+))?") {
+                        if ($trimLine -match "\[download\]\s*([\d\.]+)%\s*of\s*~?\s*[\d\.]+[a-zA-Z]+(?:.*?at\s+([^\s]+))?(?:\s+ETA\s+([^\s]+))?") {
+                            $pctStr = $matches[1]
                             $spd = if ($matches[2]) { $matches[2] } else { "---" }; $eta = if ($matches[3]) { $matches[3] } else { "---" }
-                            $winObj.Label.Text = "Progreso: $($matches[1])`nVelocidad: $spd | ETA: $eta"
+                            $winObj.Label.Text = "Progreso: $pctStr%`nVelocidad: $spd | ETA: $eta"
+                            
+                            if ($winObj.ProgressBar -and $winObj.ProgressBar.Style -ne "Continuous") {
+                                $winObj.ProgressBar.Style = "Continuous"
+                            }
+                            try {
+                                $val = [int][math]::Round([double]::Parse($pctStr, [System.Globalization.CultureInfo]::InvariantCulture))
+                                if ($val -lt 0) { $val = 0 } elseif ($val -gt 100) { $val = 100 }
+                                $winObj.ProgressBar.Value = $val
+                            } catch {}
                         } elseif ($trimLine -match "\[Merger\]|\[ExtractAudio\]|\[VideoConvertor\]") {
                             $winObj.Label.Text = "Procesando audio/video (ffmpeg)...`nEsto puede tardar un momento."
+                            if ($winObj.ProgressBar -and $winObj.ProgressBar.Style -ne "Marquee") {
+                                $winObj.ProgressBar.Style = "Marquee"
+                            }
                         }
                     }
                     # Iniciar la tarea de leer la siguiente línea
@@ -140,12 +172,13 @@ function Ejecutar-YtDlp($argumentos, $winObj, $esDescarga) {
 function Pedir-URL {
     $frm = New-Object System.Windows.Forms.Form
     $frm.Text = "LazyDLP"; $frm.Size = "400,180"; $frm.StartPosition = "CenterScreen"
+    if ($global:appIcon) { $frm.Icon = $global:appIcon }
     $frm.FormBorderStyle = "FixedSingle"; $frm.MaximizeBox = $false
     $frm.BackColor = [System.Drawing.Color]::White
     $frm.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 
     $lbl = New-Object System.Windows.Forms.Label
-    $lbl.Text = "Pega el link de YouTube:"
+    $lbl.Text = "Link de YouTube:"
     $lbl.SetBounds(25, 20, 330, 20)
     $frm.Controls.Add($lbl)
 
@@ -172,7 +205,7 @@ try {
     $installerPs1 = Join-Path $baseDir "instalador.ps1"
 
     if ($needsInstall) {
-        $msgError = "Faltan dependencias necesarias (yt-dlp / ffmpeg).`n`n¿Deseas abrir la terminal para instalarlas automáticamente ahora?"
+        $msgError = "Es necesario instalar estos paquetes: yt-dlp, ffmpeg.`n`nDeseas abrir la terminal para instalarlas automáticamente ahora?"
         $resp = [System.Windows.Forms.MessageBox]::Show($msgError, "Instalación Requerida", "YesNo", "Information")
         if ($resp -eq "Yes") {
             if (Test-Path $installerPs1) {
@@ -187,7 +220,7 @@ try {
         } else { exit }
     } else {
         # Buscar actualizaciones de fondo sin congelar la app
-        $winCheck = Mostrar-Carga "Buscando actualizaciones de yt-dlp..." $false
+        $winCheck = Mostrar-Carga "Buscando actualizaciones de paquetes externos..." $false
         $job = Start-Job -ScriptBlock { cmd.exe /c "winget upgrade --id yt-dlp.yt-dlp --accept-source-agreements 2>&1" | Out-String }
         while ($job.State -eq 'Running') {
             [System.Windows.Forms.Application]::DoEvents()
@@ -198,7 +231,7 @@ try {
 
         # Si encuentra el paquete y NO dice que no hay actualizaciones
         if ($upgCheck -match "yt-dlp\.yt-dlp" -and $upgCheck -notmatch "No applicable update|No se encontró ninguna|ninguna versión") {
-            $msgUpg = "Se ha encontrado una nueva actualización para el motor de descargas (yt-dlp).`n`n¿Deseas abrir la terminal para actualizarlo ahora?"
+            $msgUpg = "Se ha encontrado una nueva actualización para el motor de descargas (yt-dlp).`n`nDeseas abrir la terminal para actualizarlo ahora?"
             if ([System.Windows.Forms.MessageBox]::Show($msgUpg, "Actualización Disponible", "YesNo", "Information") -eq "Yes") {
                 Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$installerPs1`"" -Verb RunAs -Wait
             }
@@ -253,6 +286,7 @@ try {
     $f = New-Object System.Windows.Forms.Form
     $f.Text = "Descargar: $($videoData.title)"; $f.Size = "550,260"; $f.StartPosition = "CenterScreen"
     $f.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    if ($global:appIcon) { $f.Icon = $global:appIcon }
     $f.BackColor = [System.Drawing.Color]::White
     $f.FormBorderStyle = "FixedSingle"; $f.MaximizeBox = $false
     
