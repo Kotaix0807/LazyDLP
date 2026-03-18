@@ -1,0 +1,6 @@
+# Ignorar archivos de registro y configuración local
+assets/instalacion_log.txt
+assets/error_log.txt
+assets/yt_config.ini
+LazyDLP-installer.bat
+LazyDLP-terminal.bat
