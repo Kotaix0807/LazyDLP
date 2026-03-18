@@ -175,11 +175,11 @@ try {
                     "Deseas ejecutar el instalador automáticamente ahora?"
         $resp = [System.Windows.Forms.MessageBox]::Show($msgError, "Dependencias faltantes", "YesNo", "Information")
         if ($resp -eq "Yes") {
-            $installerBat = Join-Path (Split-Path $baseDir -Parent) "LazyDLP-installer.bat"
-            if (Test-Path $installerBat) {
-                Start-Process $installerBat
+            $installerPs1 = Join-Path $baseDir "instalador.ps1"
+            if (Test-Path $installerPs1) {
+                Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$installerPs1`""
             } else {
-                [System.Windows.Forms.MessageBox]::Show("No se encontró LazyDLP-installer.bat en la raíz del proyecto.", "Error", "OK", "Error")
+                [System.Windows.Forms.MessageBox]::Show("No se encontró instalador.ps1 en la carpeta src.", "Error", "OK", "Error")
             }
         }
         exit
