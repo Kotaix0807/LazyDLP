@@ -14,13 +14,12 @@ LazyDLP es una herramienta con interfaz gráfica (GUI) ligera y nativa para Wind
 ## 🚀 Instrucciones de Uso
 
 ### 1. Instalación (Solo la primera vez)
-1. Descarga o clona este repositorio en tu computadora.
-2. Entra a la carpeta `src`, haz clic derecho sobre el archivo `instalador.ps1` y selecciona **Ejecutar con PowerShell**.
-3. Acepta los permisos de Administrador cuando Windows te lo pregunte.
-4. Una ventana visual te mostrará el progreso mientras se instalan las dependencias. Espera el mensaje de "¡Instalación completa!".
+1. Descarga la última versión de la aplicación desde la sección **Releases** y extrae el archivo ZIP.
+2. Haz doble clic en el archivo **`LazyDLP.exe`**.
+3. Si es tu primera vez usándolo, el programa detectará automáticamente qué le falta y te pedirá permiso para instalarlo en una terminal. Acéptalo.
 
 ### 2. Descargar contenido
-1. Entra a la carpeta `src`, haz clic derecho sobre el archivo `main.ps1` y selecciona **Ejecutar con PowerShell** para iniciar el programa principal.
+1. Ejecuta **`LazyDLP.exe`**. Opcionalmente te avisará si hay actualizaciones disponibles.
 2. Pega un enlace válido de YouTube y presiona la tecla **Enter**.
 3. Selecciona en el menú desplegable la calidad de video (MP4) o audio (M4A/MP3) que deseas.
 4. Haz clic en "Cambiar Carpeta" si deseas guardar el archivo en otro lugar.

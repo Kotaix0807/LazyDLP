@@ -168,21 +168,41 @@ function Pedir-URL {
 }
 
 try {
-    # Verificar que los componentes están instalados antes de iniciar
-    if (!(Get-Command yt-dlp -ErrorAction SilentlyContinue) -or !(Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-        $msgError = "Faltan dependencias necesarias para continuar.`n`n" +
-                        "Se instalarán yt-dlp y ffmpeg en su versión más reciente.`n`n" +
-                    "Deseas ejecutar el instalador automáticamente ahora?"
-        $resp = [System.Windows.Forms.MessageBox]::Show($msgError, "Dependencias faltantes", "YesNo", "Information")
+    $needsInstall = !(Get-Command yt-dlp -ErrorAction SilentlyContinue) -or !(Get-Command ffmpeg -ErrorAction SilentlyContinue)
+    $installerPs1 = Join-Path $baseDir "instalador.ps1"
+
+    if ($needsInstall) {
+        $msgError = "Faltan dependencias necesarias (yt-dlp / ffmpeg).`n`n¿Deseas abrir la terminal para instalarlas automáticamente ahora?"
+        $resp = [System.Windows.Forms.MessageBox]::Show($msgError, "Instalación Requerida", "YesNo", "Information")
         if ($resp -eq "Yes") {
-            $installerPs1 = Join-Path $baseDir "instalador.ps1"
             if (Test-Path $installerPs1) {
-                Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$installerPs1`""
+                # Ejecuta la terminal visible, pide Admin y ESPERA a que termine para continuar
+                Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$installerPs1`"" -Verb RunAs -Wait
+                # Recarga variables de entorno para detectar las nuevas instalaciones
+                $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
             } else {
                 [System.Windows.Forms.MessageBox]::Show("No se encontró instalador.ps1 en la carpeta src.", "Error", "OK", "Error")
+                exit
+            }
+        } else { exit }
+    } else {
+        # Buscar actualizaciones de fondo sin congelar la app
+        $winCheck = Mostrar-Carga "Buscando actualizaciones de yt-dlp..." $false
+        $job = Start-Job -ScriptBlock { cmd.exe /c "winget upgrade --id yt-dlp.yt-dlp --accept-source-agreements 2>&1" | Out-String }
+        while ($job.State -eq 'Running') {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 50
+        }
+        $upgCheck = Receive-Job $job; Remove-Job $job
+        $winCheck.Form.Close()
+
+        # Si encuentra el paquete y NO dice que no hay actualizaciones
+        if ($upgCheck -match "yt-dlp\.yt-dlp" -and $upgCheck -notmatch "No applicable update|No se encontró ninguna|ninguna versión") {
+            $msgUpg = "Se ha encontrado una nueva actualización para el motor de descargas (yt-dlp).`n`n¿Deseas abrir la terminal para actualizarlo ahora?"
+            if ([System.Windows.Forms.MessageBox]::Show($msgUpg, "Actualización Disponible", "YesNo", "Information") -eq "Yes") {
+                Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$installerPs1`"" -Verb RunAs -Wait
             }
         }
-        exit
     }
 
     $url = Pedir-URL
